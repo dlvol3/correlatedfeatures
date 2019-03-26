@@ -1,5 +1,6 @@
 # %% Test feature sets crafting
 # Import the lib.
+
 from scipy.linalg import cholesky
 import numpy as np
 import pandas as pd
@@ -7,11 +8,8 @@ from scipy.stats import pearsonr, norm
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import train_test_split, GridSearchCV, KFold, cross_val_score
-import os
+from sklearn.model_selection import train_test_split
 from scipy import interp
-from itertools import cycle
-from sklearn import svm, datasets
 from sklearn.metrics import roc_curve, auc
 from sklearn.model_selection import StratifiedKFold
 
@@ -25,11 +23,11 @@ for fi in range(len(fs_sb)):
     no_fs2 = no_total - no_fs1
     m1 = np.full((no_fs1, no_fs1), 0.8)
     np.fill_diagonal(m1, 1)
-    m2 = np.full((no_fs2, no_fs2), 0.1)
+    m2 = np.full((no_fs2, no_fs2), 0.8)
     np.fill_diagonal(m2, 1)
     m3 = np.full((30, 30), 0.05)
     np.fill_diagonal(m3, 1)
-    # Calculating the3cholesky's decomposition matrix for the correlated set fs1
+    # Calculating the 3 cholesky's decomposition matrix for the correlated set fs1
     uppercho1 = cholesky(m1, lower=False)
     uppercho2 = cholesky(m2, lower=False)
     uppercho3 = cholesky(m3, lower=False)
@@ -51,7 +49,7 @@ for fi in range(len(fs_sb)):
             corr, _ = pearsonr(array[:, a[i][0]], array[:, a[i][1]])
             corr_m.append(corr)
         re = [abs(x) for x in corr_m]
-        print(sum(re) / len(re))
+        # print(sum(re) / len(re))
         sns.distplot(corr_m, label="Distributions of pairwise correlations within each feature set")
     fn = "Distributions of pairwise correlations within each feature set when no_fs1 equals " + str(no_fs1) + ".png"
     plt.savefig(fn)
@@ -70,6 +68,7 @@ for fi in range(len(fs_sb)):
     mu2, std2 = norm.fit(fs2.flatten())
     # Get the symmetric point
     sym_p = round((mu1 + mu2) / 2, 3)
+    print('The mid-point of two distributions is {} when no_fs1 equals {}'.format(sym_p, no_fs1))
     # Merging arrays into dataframe
     fs1df = pd.DataFrame(data=fs1,
                          index=["Sample" + str(j) for j in range(1000)],
@@ -82,9 +81,9 @@ for fi in range(len(fs_sb)):
                          columns=["fs3_feature" + str(i) for i in range(30)])
     training = pd.concat([fs1df, fs2df, fs3df], axis=1)
     # Crafting the class of 1000 samples with bais(fs1 more importance than fs2)
-    training['class'] = np.where((((training.iloc[:, 0:no_fs1].sum(axis=1)) / no_fs1) * 3) +
-                                 (((training.iloc[:, no_fs1:no_total].sum(axis=1)) / no_fs2) * 2) > sym_p, 1,
-                                 0)
+    training['class'] = np.where(training.iloc[:, 0:no_fs1].apply(lambda x: x - sym_p).mean(axis=1) * 2.5 +
+                                 training.iloc[:, no_fs1:no_total].apply(lambda x: x - sym_p).mean(axis=1) * 2 > 0,
+                                 1, 0)
     # Check the class distribution
     sns.countplot(training['class'])
     fn = "fs1 more important_class distribution when no_fs1 equals " + str(no_fs1) + ".png"
@@ -152,9 +151,9 @@ for fi in range(len(fs_sb)):
     #####
     # Changing the classify equation, now fs2 contributes more than fs1
     #####
-    training['class'] = np.where((((training.iloc[:, 0:no_fs1].sum(axis=1)) / no_fs1) * 1) +
-                                 (((training.iloc[:, no_fs1:no_total].sum(axis=1)) / no_fs2) * 2) > sym_p, 1,
-                                 0)
+    training['class'] = np.where(training.iloc[:, 0:no_fs1].apply(lambda x: x - sym_p).mean(axis=1) * 2 +
+                                 training.iloc[:, no_fs1:no_total].apply(lambda x: x - sym_p).mean(axis=1) * 2.5 > 0,
+                                 1, 0)
     # Check the class distribution
     sns.countplot(training['class'])
     fn = "fs2 more important_class distribution when no_fs1 equals " + str(no_fs1) + ".png"
@@ -219,6 +218,3 @@ for fi in range(len(fs_sb)):
     feature_importances = feature_importances.sort_values('importance', ascending=False)
     fn = "fs2 more important_feature importance when no_fs1 equals " + str(no_fs1) + ".txt"
     feature_importances.to_csv(fn, sep='\t')
-
-
-
